@@ -3,8 +3,9 @@ import sys
 from time import time
 
 class progBar():
-  def __init__(self, total:Union[float,int],startTime:int = None, prefix:str='Progress:',length:int=50,fill:str='█',empty:str = '-') -> None:
+  def __init__(self, total:Union[float,int],startTime:int = None, prefix:str='Progress:',length:int=50,fill:str='█',empty:str = '-',disable:bool = False) -> None:
     self.total = total
+    self.disable = disable
     if(type(startTime) != type(None)):
       self.startTime = startTime
     else:
@@ -17,6 +18,7 @@ class progBar():
     self.iteration = 0
   
   def print(self,iteration, suffix="", prefix:str = None):
+    if(self.disable): return
     elapsed_time = time() - self.startTime
 
     self.iteration = iteration
@@ -38,7 +40,9 @@ class progBar():
   def incriment(self,suffix:str = ""):
     self.iteration += 1
     self.print(self.iteration,suffix)
-
+  
+  def decriment(self):
+    self.iteration -= 1
 
 def printProgressBar(iteration, total, startTime, prefix='Progress:', suffix='', length=50, fill='█'):
   total -= 1
