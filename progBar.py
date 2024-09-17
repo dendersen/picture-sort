@@ -41,6 +41,9 @@ class progBar():
     self.iteration += 1
     self.print(self.iteration,suffix)
   
+  def skip(self, distance: Union[float,int]):
+    self.iteration += distance
+  
   def decriment(self):
     self.iteration -= 1
 
@@ -57,7 +60,6 @@ def printProgressBar(iteration, total, startTime, prefix='Progress:', suffix='',
   bar = fill * filled_length + '-' * (length - filled_length)
   time_str = 'Remaining: {0:.1f}s'.format(remaining_time)
   count_str = '{}/{}'.format(iteration, total)
-
 
   sys.stdout.write('\r%s |%s| %s%% %s %s %s' % (prefix, bar, percent, count_str, time_str, suffix))
   sys.stdout.flush()
