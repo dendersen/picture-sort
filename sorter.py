@@ -14,7 +14,7 @@ from hachoir.metadata.metadata import Metadata
 register_heif_opener()
 maxDepth:int = 3
 files:list[str] = []
-permitedFileTypes = ["jpg", "JPG","png","PNG","HEIC","heic","JPEG","jpeg"]
+permittedFileTypes = ["jpg", "JPG","png","PNG","HEIC","heic","JPEG","jpeg"]
 secondaryTypes = [
   "MOV","mov",
   "flv","FLV",
