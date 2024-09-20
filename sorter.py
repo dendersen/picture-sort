@@ -31,6 +31,7 @@ secondaryTypes = [
 # global variables
 # a list containing all the dates of the pictures and the path to the pictures
 dates:list[list[str]] = []
+datesLess:list[list[str]] = []
 
 # a list containing all the files to be sorted
 files:list[str] = []
@@ -106,34 +107,34 @@ def init(skip:bool = False, move = None, fileData = None, readAll = None, Debug 
     threads = False
     folders = True
   else:
-    path = input("\n\nhvor er billederne, tryk enter for auto: ") or "./"
+    path = input("\n\nhvor er billederne, tast enter for auto: ") or "./"
     
-    precision = input("\n\nskal der opdeles efter måned?\ny for ja alt andet for nej: ") == "y"
+    precision = input("\n\nskal der opdeles efter måned?\ntast y for ja alt andet for nej: ") == "y"
     
     if(precision):
-      highPrecision = input("\n\nskal der opdeles efter dag?\ny for ja alt andet for nej: ") == "y"
+      highPrecision = input("\n\nskal der opdeles efter dag?\ntast y for ja alt andet for nej: ") == "y"
     else:
-      highPrecision = input("\n\nskal der opdeles efter år\nvære en usorteret bunke\ny for ja alt andet for nej: ") == "y"
+      highPrecision = input("\n\nskal der opdeles efter år\nvære en usorteret bunke\ntast y for ja alt andet for nej: ") == "y"
     
     if(move == None):
-      makeCopy = input("\n\nskal billederne kopires, hvis ikke flyttes de?\ny for ja alt andet for nej: ") == "y"
+      makeCopy = input("\n\nskal billederne kopires, hvis ikke flyttes de?\ntast y for ja alt andet for nej: ") == "y"
     
     if(fileData == None):
-      useFiles = input("\n\nmå mindre præcise datoer benytes?\ny for ja alt andet for nej: ") == "y"
+      useFiles = input("\n\nmå mindre præcise datoer benytes?\ntast y for ja alt andet for nej: ") == "y"
     
     if(fileData and readAll == None):
-      readAllTypes = input("\n\nskal alle filer sorteres?\n(det garanteres ikke at filerne sorteres korrekt)\ny for ja alt andet for nej: ") == "y"
+      readAllTypes = input("\n\nskal alle filer sorteres?\n(det garanteres ikke at filerne sorteres korrekt)\ntast y for ja alt andet for nej: ") == "y"
     
     debug = Debug
     
     if(RemoveDubes == None):
-      antiDube = input("\n\nskal gentagende BILLEDER fjernes \n(baseret på billede ikke filnavn)\ny for ja alt andet for nej: ") == "y"
+      antiDube = input("\n\nskal gentagende BILLEDER fjernes \n(baseret på billede ikke filnavn)\ntast y for ja alt andet for nej: ") == "y"
     
     if(threads == None):
-      threads = input("\n\nWIP threads\nvil formentligt fejle\ny for ja alt andet for nej: ") == "y"
+      threads = input("\n\nWIP threads\nvil formentligt fejle\ntast y for ja alt andet for nej: ") == "y"
     
     if(Folders == None):
-      folders = input("\n\nskal billederne sorteres i deres originale mapper?\ny for ja alt andet for nej: ") == "y"
+      folders = input("\n\nskal billederne sorteres i deres originale mapper?\ntast y for ja alt andet for nej: ") == "y"
   
   print("\n\nfinder alle filer")
   files = loadFiles(path)
@@ -173,10 +174,10 @@ def check() -> None:
   toBeRemoved:list[int] = []
   prog = progBar(len(files),disable=debug)
   for j,f in enumerate(files):
-    if(
+    if(not(
       ((not readAllTypes) and acceptedType(f)) or 
       (readAllTypes and not os.path.isdir(f))
-    ):
+    )):
       toBeRemoved.append(j)
     prog.incriment()
   print(f"\n\n{len(files)} filer registreret")
@@ -195,7 +196,7 @@ def acceptedType(picPath:str) -> bool:
   Returns:
       bool: wether it is a valid file type or not
   """
-  return picType(picPath) or secondaryType()
+  return picType(picPath) or secondaryType(picPath)
 
 def picType(picPath:str) -> bool:
   """checks if the file is a picture file with potential exif information
@@ -234,8 +235,8 @@ def findDate() -> None:
     d = getDate(path)
     if(d == None):# no dates found
       miss += 1
+      datesLess.append(path)
     else:# dates found
-      files.remove(path)
       dates.append(d)
     prog.incriment()
   print()
@@ -265,7 +266,6 @@ def getDate(picPath:str) -> tuple[str]:
     out = getDate_png(*args)
   elif(secondaryType(picPath)):
     out = exifRead(picPath)
-  args[0].close()
   # if date extraction failed, try to get the date from the file itself
   if(out == None):
     out = fileDate(picPath)
@@ -346,6 +346,7 @@ def exifRead(picPath:str) -> tuple[str]:
   metadata:Metadata = extractMetadata(parser)
   data:dict = metadata.exportDictionary().get("Metadata")
   time:datetime = datetime.now()
+  if(data == None or len(data.keys()) == 0): return
   for key in data.keys():
     key:str
     if("date" in key.lower() or "modification" in key.lower() or "time" in key.lower()):
@@ -462,8 +463,8 @@ def printData(picPath:str, prefix = "") -> None:
   """
   
   print(f"{prefix}{picPath}",end="\n\n")
-  i = img.open(picPath)
   try:
+    i = img.open(picPath)
     from PIL.ExifTags import TAGS
     i.load()
     print(picPath)
@@ -483,7 +484,6 @@ def printData(picPath:str, prefix = "") -> None:
     
     if(data == None or len(data.keys()) == 0):
       print(f"\n{prefix}Data Search Failed")
-  i.close()
 
 def fileDate(picPath:str) -> tuple[str]:
   """
@@ -529,10 +529,10 @@ def removeDubes() -> None:
   dubes = []
   print("\nchecker for identiske billeder")
   for i in range(len(files)):
-    prog.incriment("filer checket")
-    if(img.isImageType(not files[i])): continue
+    prog.incriment()
+    if(not img.isImageType(files[i])): continue
     for j in range(i+1,len(files)):
-      if(img.isImageType(not files[j])): continue
+      if(not img.isImageType(files[j])): continue
       img1 = img.open(files[i])
       img2 = img.open(files[j])
       if(
@@ -558,15 +558,25 @@ movePictures()
 
 #ending loop for debug and user being able to see know the program didn't crash but actually finished
 while(True):
-  print("\n\nluk vinduet eller tryk q for at slukke programet")
-  print("tryk d for at se info om de filer der blev sorteret")
-  print("tryk r for at se filer der ikke blev sorteret")
-  user = input("luk vinduet eller tryk q for at slukke program: ")
+  print("\n\nluk vinduet eller tast q for at slukke programet")
+  print(f"tast d for at se info om de filer der blev sorteret ({len(dates)})")
+  print(f"tast r for at se filer der ikke blev sorteret ({len(datesLess)})")
+  print(f"tast a for at se alle filer ({len(files)})")
+  user = input("")
   if(user == "q"): 
     exit()
   if(user == "d"):
+    if(len(dates) == 0):
+      print("der er ingen filer der blev sorteret")
     for i in dates:
       printData(i[1])
   if(user == "r"):
+    if(len(datesLess) == 0):
+      print("der er ingen filer der ikke blev sorteret")
+    for path in datesLess:
+      printData(path)
+  if(user == "a"):
+    if(len(files) == 0):
+      print("der er ingen filer")
     for path in files:
       printData(path)
