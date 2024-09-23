@@ -14,7 +14,6 @@ from hachoir.metadata.metadata import Metadata
 #constants
 register_heif_opener()
 maxDepth:int = 3
-permittedFileTypes = ["jpg", "JPG","png","PNG","HEIC","heic","JPEG","jpeg"]
 secondaryTypes = [
   "MOV","mov",
   "flv","FLV",
@@ -196,19 +195,7 @@ def acceptedType(picPath:str) -> bool:
   Returns:
       bool: wether it is a valid file type or not
   """
-  return picType(picPath) or secondaryType(picPath)
-
-def picType(picPath:str) -> bool:
-  """checks if the file is a picture file with potential exif information
-  Args:
-      picPath (str): the path to the file that will be inspected
-  Returns:
-      bool: wether the file is a picture file that can contain exif or not
-  """
-  for i in permittedFileTypes:
-    if(picPath.endswith(i)):
-      return True
-  return False
+  return img.isImageType(img.open(picPath)) or secondaryType(picPath)
 
 def secondaryType(picPath:str) ->bool:
   """checks if the file is a picture, video or audio that may contain exif like information
@@ -252,28 +239,22 @@ def getDate(picPath:str) -> tuple[str]:
   tuple[str]: A tuple containing the date information extracted from the picture file.
   """
   
-  if(picType(picPath)):
-    args = [img.open(picPath),picPath]
-  
-  extension:str = picPath[::-1].split(".",1)[0][::-1].lower() 
   # flip, splits at first ".",gets first part, flip, this is the extension
-  out:tuple[str] = None
-  
-  # finds out based on extension how the exif information should be read
-  if(extension == "jpg" or extension ==  "heic" or extension ==  "jpeg"):
-    out = getDate_jpg(*args)
-  elif(extension == "png"):
-    out = getDate_png(*args)
-  elif(secondaryType(picPath)):
-    out = exifRead(picPath)
-  # if date extraction failed, try to get the date from the file itself
-  if(out == None):
-    out = fileDate(picPath)
-  if(out == None and debug):
-    printData(picPath)
-  return out
+  out:datetime = datetime.now()
 
-def getDate_jpg(pic:img ,picPath:str) -> tuple[str]:
+  # finds out based on extension how the exif information should be read
+  if(img.isImageType(img.open(picPath))):
+    out = getDate_img(picPath,picPath)
+  out = min(out, metaDataRead(picPath))
+  
+  # if date extraction failed, try to get the date from the file itself
+  
+  out = min(out,fileDate(picPath))
+  if(debug):
+    printData(picPath)
+  return timeFormat(picPath, out)
+
+def getDate_img(pic:str ,picPath:str) -> datetime:
   """
   Retrieves the date from the EXIF data of an image with readily available EXIF.
   Parameters:
@@ -283,57 +264,63 @@ def getDate_jpg(pic:img ,picPath:str) -> tuple[str]:
   - tuple[str]: A tuple containing the file path and the date extracted from the EXIF data.
           If the EXIF data does not contain the date, None is returned.
   """
-  
-  exifData = pic.getexif()
-  out:tuple[str,list[str]]
-  if(exifData): # if there is exif data
-    if(exifData.get(36867)):# if there is a date time original
-      data = exifData.get(36867)
-      if isinstance(data, bytes):
-        data = data.decode()
-      out = (picPath,data)
-    elif(exifData.get(306)):# if there is a date time
-      data = exifData.get(306)
-      if isinstance(data, bytes):
-        data = data.decode()
-      out = (picPath,data)
-    elif(exifData.get(36868)):# if there is a date time digitized
-      data = exifData.get(36868)
-      if isinstance(data, bytes):
-        data = data.decode()
-      out = (picPath,data)
-    elif(exifData.get(50971)):# if there is a subsec time
-      data = exifData.get(50971)
-      if isinstance(data, bytes):
-        data = data.decode()
-      out = (picPath,data)
-    elif(exifData.get(29)):# if there is a date time original (old)
-      data = exifData.get(29)
-      if isinstance(data, bytes):
-        data = data.decode()
-      out = (picPath,data)
-    else:# if there is no date time
-      out = None
-  else:# if there is no exif data
-    out = None
-  
-  return out
+  try:
+    pic = img.open(pic)
+    pic.load()
+    time:datetime = datetime.now()
+    exifData = pic.getexif()
+    
+    if(exifData): # if there is exif data
+      if(exifData.get(36867)):# if there is a date time original
+        data = exifData.get(36867)
+        if isinstance(data, bytes):
+          data = data.decode()
+        if(not time):
+          time = data
+        else:
+          time = min(time, datetime.fromisoformat(data))
+      if(exifData.get(306)):# if there is a date time
+        data = exifData.get(306)
+        if isinstance(data, bytes):
+          data = data.decode()
+        if(not time):
+          time = data
+        else:
+          time = min(time, datetime.fromisoformat(data))
+      if(exifData.get(36868)):# if there is a date time digitized
+        data = exifData.get(36868)
+        if isinstance(data, bytes):
+          data = data.decode()
+        if(not time):
+          time = data
+        else:
+          time = min(time, datetime.fromisoformat(data))
+      if(exifData.get(50971)):# if there is a subsec time
+        data = exifData.get(50971)
+        if isinstance(data, bytes):
+          data = data.decode()
+        if(not time):
+          time = data
+        else:
+          time = min(time, datetime.fromisoformat(data))
+      if(exifData.get(29)):# if there is a date time original (old)
+        data = exifData.get(29)
+        if isinstance(data, bytes):
+          data = data.decode()
+        if(not time):
+          time = data
+        else:
+          time = min(time, datetime.fromisoformat(data))
+    pic.close()
+  except:
+    try:
+      pic.close()
+    except:
+      pass
+    return time
+  return time
 
-def getDate_png(pic:img ,picPath:str) -> tuple[str]:
-  """prepares and retrieves the date from EXIF information of an image, audio or video file that doesn't have readily available EXIF.
-
-  Args:
-  - pic (img): The image object.
-  - picPath (str): The file path of the image.
-
-  Returns:
-  - tuple[str]: A tuple containing the file path and the date extracted from the EXIF data.
-          If the EXIF data does not contain the date, None is returned.
-  """
-  pic.load()
-  return getDate_jpg(pic ,picPath, prog)
-
-def exifRead(picPath:str) -> tuple[str]:
+def metaDataRead(picPath:str) ->datetime:
   """
   Reads the metadata of the given picture file and extracts the relevant time information.
   Parameters:
@@ -341,17 +328,20 @@ def exifRead(picPath:str) -> tuple[str]:
   Returns:
     tuple[str]: A tuple containing the formatted picture path and the extracted time information.
   """
-  
-  parser = createParser(picPath)
-  metadata:Metadata = extractMetadata(parser)
-  data:dict = metadata.exportDictionary().get("Metadata")
   time:datetime = datetime.now()
-  if(data == None or len(data.keys()) == 0): return
-  for key in data.keys():
-    key:str
-    if("date" in key.lower() or "modification" in key.lower() or "time" in key.lower()):
-      time = min(time, datetime.fromisoformat(data.get(key)))
-  return timeFormat(picPath,time)
+  try:
+    parser = createParser(picPath)
+    
+    metadata:Metadata = extractMetadata(parser)
+    data:dict = metadata.exportDictionary().get("Metadata")
+    if(data == None or len(data.keys()) == 0): return
+    for key in data.keys():
+      key:str
+      if("date" in key.lower() or "modification" in key.lower() or "time" in key.lower()):
+        time = min(time, datetime.fromisoformat(data.get(key)))
+  except:
+    pass
+  return time
 
 def movePictures() -> None:
   """
@@ -475,15 +465,19 @@ def printData(picPath:str, prefix = "") -> None:
         data = data.decode()
       print(f"{prefix}{tag}:{TAGS.get(tag,tag)}:{data}")
   except:#if standard exif reading fails get all metadata instead
-    parser = createParser(picPath)
-    metadata:Metadata = extractMetadata(parser)
-    data:dict = metadata.exportDictionary().get("Metadata")
-    for key in data.keys():
-      key:str
-      print(f"{prefix}{key}:{data.get(key)}")
-    
-    if(data == None or len(data.keys()) == 0):
-      print(f"\n{prefix}Data Search Failed")
+    print("failed to get exif information")
+    try:
+      parser = createParser(picPath)
+      metadata:Metadata = extractMetadata(parser)
+      data:dict = metadata.exportDictionary().get("Metadata")
+      for key in data.keys():
+        key:str
+        print(f"{prefix}{key}:{data.get(key)}")
+      
+      if(data == None or len(data.keys()) == 0):
+        print(f"\n{prefix}Data Search Failed")
+    except:
+      print("failed to get metadata")
 
 def fileDate(picPath:str) -> tuple[str]:
   """
@@ -496,10 +490,10 @@ def fileDate(picPath:str) -> tuple[str]:
   
   time = min(min(
     datetime.fromtimestamp(os.stat(picPath).st_atime),
-    datetime.fromtimestamp(os.stat(picPath).st_ctime)),
+    datetime.fromtimestamp(os.stat(picPath).st_birthtime)),
     datetime.fromtimestamp(os.stat(picPath).st_mtime)
   )
-  return timeFormat(picPath,time)
+  return time
 
 def timeFormat(picPath:str, time:datetime)-> tuple[str]:
   """
@@ -530,18 +524,21 @@ def removeDubes() -> None:
   print("\nchecker for identiske billeder")
   for i in range(len(files)):
     prog.incriment()
-    if(not img.isImageType(files[i])): continue
+    if(not img.isImageType(img.open(files[i]))): continue
     for j in range(i+1,len(files)):
-      if(not img.isImageType(files[j])): continue
-      img1 = img.open(files[i])
-      img2 = img.open(files[j])
-      if(
-        (img1.size == img2.size) and #see that the images are the same size (for speed)
-        (ImageChops.difference(img1,img2).getbbox() == None)):
-        # get the difference and remove all black pixels 
-        # if any non black pixels are left the images are not identical
-        dubes.append(i)
-        break
+      try:
+        if(not img.isImageType(img.open(files[j]))): continue
+        img1 = img.open(files[i])
+        img2 = img.open(files[j])
+        if(
+          (img1.size == img2.size) and #see that the images are the same size (for speed)
+          (ImageChops.difference(img1,img2).getbbox() == None)):
+          # get the difference and remove all black pixels 
+          # if any non black pixels are left the images are not identical
+          dubes.append(i)
+          break
+      except:
+        pass
   print(f"\n{len(dubes)} identiske billeder fundet")
   prog = progBar(len(dubes), disable=debug)
   print("fjerner identiske billeder")
