@@ -37,36 +37,36 @@ files:list[str] = []
 
 #flags
 # if the files should be split into years
-precision:bool = False
+precision:bool = None
 
 # if the files should be split into months
-highPrecision:bool = False
+highPrecision:bool = None
 
 # if the files should be copied instead of moved
-makeCopy: bool = False
+makeCopy: bool = None
 
 # if the program should print debug information
-debug:bool = False
+debug:bool = None
 
 # if the program should use less precise dates
-useFiles = False
+useFiles = None
 
 # if the program should read all file types
-readAllTypes = False
+readAllTypes = None
 
 # if the program should remove duplicate images
-antiDube = False
+antiDube = None
 
 # if the program should use threads
-threads = False
+threads = None
 
 #use original folders
-folders = False
+folders = None
 
 #where the pictures where found
 path = "./"
 
-def init(skip:bool = False, move = None, fileData = None, readAll = None, Debug = False, RemoveDubes = None, Folders = None) -> None:
+def init(skip:bool = False, move:bool = None, fileData:bool = None, readAll:bool = None, Debug:bool = False, RemoveDubes:bool = None, Folders:bool = None, Path:str = None, ignoreCMD:bool = False) -> None:
   """
   Initializes the sorting process for pictures.
   Args:
@@ -81,17 +81,62 @@ def init(skip:bool = False, move = None, fileData = None, readAll = None, Debug 
   """
   global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path
   #takes in arguments from the command line
-  for i in range(1,len(sys.argv)):
-    if(i == "-skip"): skip = True
-    if(i == "-kopi"): move = False
-    if(i == "-flyt"): move = True
-    if(i == "--debug"): debug = True
-    if(i == "-slet"): removeDubes = True
-    if(i == "-file"): fileData = True
-    if(i == "-all"): readAll = True
-    if(i == "-threads"): threads = True
-    if(i == "-folders"): folders = True
+  if(not ignoreCMD):
+    for i in range(1,len(sys.argv)):
+      if(i == "-skip"): skip = True
+      if(i == "-kopi"): move = False
+      if(i == "-flyt"): move = True
+      if(i == "--debug"): debug = True
+      if(i == "-slet"): removeDubes = True
+      if(i == "-file"): fileData = True
+      if(i == "-all"): readAll = True
+      if(i == "-threads"): threads = True
+      if(i == "-folders"): folders = True
+      if(i == "-måned"): precision = True
+      if(i == "-dag"): 
+        highPrecision = True
+        precision = True
+      if(i == "-bunke") : 
+        highPrecision = True
+        precision = False
+      if(i == "-path"): 
+        if(i + 1 >= len(sys.argv)) :
+          print(f"-path requires a path after, cannot be empty")
+        if(sys.argv[i + 1][0] != "-"):
+          path = sys.argv[i + 1] or "./"
+        else:
+          print(f"-path requires a path after, not argument like: \"{sys.argv[i + 1]}\"")
+      if(i == "-h" or i == "--help"):
+        print("flags:")
+        print("-skip    : skips all user input and uses default values")
+        print("-kopi    : copies files instead of moving them")
+        print("-flyt    : moves files instead of copying them")
+        print("--debug  : enables debug mode")
+        print("-slet    : removes duplicate images")
+        print("-file    : allows less precise dates")
+        print("-all     : reads all file types")
+        print("-threads : uses threads (not working)")
+        print("-folders : uses original folders")
+        print("-måned   : splits files into months")
+        print("-dag     : splits files into days")
+        print("-bunke   : splits files into years")
+        print("-path    : requires a path after, sets the path to the folder where the images are located")
+        exit()
   
+  if(move != None):
+    makeCopy = not move
+  if(fileData != None):
+    useFiles = fileData
+  if(readAll != None):
+    readAllTypes = readAll
+  if(RemoveDubes != None):
+    antiDube = RemoveDubes
+  if(Folders != None):
+    folders = Folders
+  if(debug != None):
+    debug = Debug
+  if(Path != None):
+    path = Path
   
   if(skip):
     # default values
@@ -106,33 +151,35 @@ def init(skip:bool = False, move = None, fileData = None, readAll = None, Debug 
     threads = False
     folders = True
   else:
-    path = input("\n\nhvor er billederne, tast enter for auto: ") or "./"
+    if(Path == None):
+      path = input("\n\nhvor er billederne, tast enter for auto: ") or "./"
     
-    precision = input("\n\nskal der opdeles efter måned?\ntast y for ja alt andet for nej: ") == "y"
+    if(precision == None):
+      precision = input("\n\nskal der opdeles efter måned?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(precision):
+    if(precision == None or precision == True):
       highPrecision = input("\n\nskal der opdeles efter dag?\ntast y for ja alt andet for nej: ") == "y"
     else:
-      highPrecision = input("\n\nskal der opdeles efter år\nvære en usorteret bunke\ntast y for ja alt andet for nej: ") == "y"
+      highPrecision = input("\n\nskal der opdeles efter år\nellers en usorteret bunke, der kan stadig opdelles i originale mapper\ntast y for ja alt andet for nej: ") == "y"
     
-    if(move == None):
+    if(makeCopy == None):
       makeCopy = input("\n\nskal billederne kopires, hvis ikke flyttes de?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(fileData == None):
+    if(useFiles == None):
       useFiles = input("\n\nmå mindre præcise datoer benytes?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(fileData and readAll == None):
+    if(useFiles and readAllTypes == None):
       readAllTypes = input("\n\nskal alle filer sorteres?\n(det garanteres ikke at filerne sorteres korrekt)\ntast y for ja alt andet for nej: ") == "y"
     
     debug = Debug
     
-    if(RemoveDubes == None):
+    if(antiDube == None):
       antiDube = input("\n\nskal gentagende BILLEDER fjernes \n(baseret på billede ikke filnavn)\ntast y for ja alt andet for nej: ") == "y"
     
     if(threads == None):
       threads = input("\n\nWIP threads\nvil formentligt fejle\ntast y for ja alt andet for nej: ") == "y"
     
-    if(Folders == None):
+    if(folders == None):
       folders = input("\n\nskal billederne sorteres i deres originale mapper?\ntast y for ja alt andet for nej: ") == "y"
   
   print("\n\nfinder alle filer")
@@ -409,7 +456,7 @@ def movePic(prog:progBar, dates:list[list[str]]) -> None:
     makeFile(newPath, i[0],not makeCopy)# save the file
     prog.incriment()
 
-def makeFile(newPath:str, orgPath:str, delete:bool):
+def makeFile(newPath:str, orgPath:str, delete:bool, nextIndex = 1) -> None:
   """
   Create a file at the specified `newPath` by copying or moving the file from `orgPath`.
   Args:
@@ -430,7 +477,7 @@ def makeFile(newPath:str, orgPath:str, delete:bool):
     f = open(newPath,'a')# generate the file
     f.close()
   else:# if the file name exists move the old file to a new name and try again
-    makeFile(newPath[::-1].split(".",1)[1][::-1] + "(1)." + newPath[::-1].split(".",1)[0][::-1],newPath,True)
+    makeFile(newPath[::-1].split(".",1)[1][::-1] + f"({nextIndex})." + newPath[::-1].split(".",1)[0][::-1],newPath,True,nextIndex + 1)
     makeFile(newPath,orgPath,delete)
   
   try:# write to the new file
@@ -475,7 +522,7 @@ def printData(picPath:str, prefix = "") -> None:
         print(f"{prefix}{key}:{data.get(key)}")
       
       if(data == None or len(data.keys()) == 0):
-        print(f"\n{prefix}Data Search Failed")
+        print(f"\nData search Failed or empty")
     except:
       print("failed to get metadata")
 
