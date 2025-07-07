@@ -10,6 +10,7 @@ from datetime import datetime
 from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
 from hachoir.metadata.metadata import Metadata
+from fileCacher import fileCacher
 
 #constants
 register_heif_opener()
@@ -25,48 +26,49 @@ secondaryTypes = [
   "MPEG_AUDIO","mpeg_audio",
   "REAL_AUDIO","real_audio",
   "SUN_NEXT_SND","sun_next_snd",
+  "RAW","raw",
 ]
 
 # global variables
 # a list containing all the dates of the pictures and the path to the pictures
 dates:list[list[str]] = []
-datesLess:list[list[str]] = []
+datesLess:list[str] = []
 
 # a list containing all the files to be sorted
 files:list[str] = []
 
 #flags
 # if the files should be split into years
-precision:bool = None
+precision:bool | None = None
 
 # if the files should be split into months
-highPrecision:bool = None
+highPrecision:bool | None = None
 
 # if the files should be copied instead of moved
-makeCopy: bool = None
+makeCopy: bool | None = None
 
 # if the program should print debug information
-debug:bool = None
+debug:bool = False
 
 # if the program should use less precise dates
-useFiles = None
+useFiles:bool | None = None
 
 # if the program should read all file types
-readAllTypes = None
+readAllTypes:bool | None = None
 
 # if the program should remove duplicate images
-antiDube = None
+antiDube:bool | None = None
 
 # if the program should use threads
-threads = None
+threads:bool | None = False
 
 #use original folders
-folders = None
+folders:bool | None = None
 
 #where the pictures where found
-path = "./"
+path:str = "./"
 
-def init(skip:bool = False, move:bool = None, fileData:bool = None, readAll:bool = None, Debug:bool = False, RemoveDubes:bool = None, Folders:bool = None, Path:str = None, ignoreCMD:bool = False) -> None:
+def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None, readAll:bool | None = None, Debug:bool = False, RemoveDubes:bool | None = None, Folders:bool | None = None, Path:str | None = None, ignoreCMD:bool = False) -> None:
   """
   Initializes the sorting process for pictures.
   Args:
@@ -79,7 +81,7 @@ def init(skip:bool = False, move:bool = None, fileData:bool = None, readAll:bool
   Returns:
     None
   """
-  global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path
+  global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path,folders
   #takes in arguments from the command line
   if(not ignoreCMD):
     for i in range(1,len(sys.argv)):
@@ -123,19 +125,19 @@ def init(skip:bool = False, move:bool = None, fileData:bool = None, readAll:bool
         print("-path    : requires a path after, sets the path to the folder where the images are located")
         exit()
   
-  if(move != None):
+  if(move is not None):
     makeCopy = not move
-  if(fileData != None):
+  if(fileData is not None):
     useFiles = fileData
-  if(readAll != None):
+  if(readAll is not None):
     readAllTypes = readAll
-  if(RemoveDubes != None):
+  if(RemoveDubes is not None):
     antiDube = RemoveDubes
-  if(Folders != None):
+  if(Folders is not None):
     folders = Folders
-  if(debug != None):
+  if(debug is not None):
     debug = Debug
-  if(Path != None):
+  if(Path is not None):
     path = Path
   
   if(skip):
@@ -151,35 +153,35 @@ def init(skip:bool = False, move:bool = None, fileData:bool = None, readAll:bool
     threads = False
     folders = True
   else:
-    if(Path == None):
+    if(Path is None):
       path = input("\n\nhvor er billederne, tast enter for auto: ") or "./"
-    
-    if(precision == None):
+
+    if(precision is None):
       precision = input("\n\nskal der opdeles efter måned?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(precision == None or precision == True):
+    if(precision is None or precision == True):
       highPrecision = input("\n\nskal der opdeles efter dag?\ntast y for ja alt andet for nej: ") == "y"
     else:
       highPrecision = input("\n\nskal der opdeles efter år\nellers en usorteret bunke, der kan stadig opdelles i originale mapper\ntast y for ja alt andet for nej: ") == "y"
     
-    if(makeCopy == None):
+    if(makeCopy is None):
       makeCopy = input("\n\nskal billederne kopires, hvis ikke flyttes de?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(useFiles == None):
+    if(useFiles is None):
       useFiles = input("\n\nmå mindre præcise datoer benytes?\ntast y for ja alt andet for nej: ") == "y"
     
-    if(useFiles and readAllTypes == None):
+    if(useFiles and (readAllTypes is None)):
       readAllTypes = input("\n\nskal alle filer sorteres?\n(det garanteres ikke at filerne sorteres korrekt)\ntast y for ja alt andet for nej: ") == "y"
     
     debug = Debug
     
-    if(antiDube == None):
+    if(antiDube is None):
       antiDube = input("\n\nskal gentagende BILLEDER fjernes \n(baseret på billede ikke filnavn)\ntast y for ja alt andet for nej: ") == "y"
     
-    if(threads == None):
+    if(threads is None):
       threads = input("\n\nWIP threads\nvil formentligt fejle\ntast y for ja alt andet for nej: ") == "y"
     
-    if(folders == None):
+    if(folders is None):
       folders = input("\n\nskal billederne sorteres i deres originale mapper?\ntast y for ja alt andet for nej: ") == "y"
   
   print("\n\nfinder alle filer")
@@ -196,7 +198,7 @@ def loadFiles(path: str, depth = 0) ->list[str]:
   Returns:
     list[str]: A list of file paths.
   """
-  
+  global maxDepth
   out:list[str] = []
   for f in os.listdir(path): # find all paths in directory
     if os.path.isfile(path + "/" + f):
@@ -242,7 +244,11 @@ def acceptedType(picPath:str) -> bool:
   Returns:
       bool: wether it is a valid file type or not
   """
-  return img.isImageType(img.open(picPath)) or secondaryType(picPath)
+  try:
+    img.open(picPath).verify()
+    return True
+  except:
+    return secondaryType(picPath)
 
 def secondaryType(picPath:str) ->bool:
   """checks if the file is a picture, video or audio that may contain exif like information
@@ -271,13 +277,13 @@ def findDate() -> None:
       miss += 1
       datesLess.append(path)
     else:# dates found
-      dates.append(d)
+      dates.append([*d])
     prog.incriment()
   print()
   print(f"\nfandt datoer til {len(dates)} billeder")
   print(f"der var {miss} billeder uden dato anmærkninger\nde vil ikke blive sorteret")
 
-def getDate(picPath:str) -> tuple[str]:
+def getDate(picPath:str) -> tuple[str,str]:
   """
   Retrieves the date information from the given picture file.
   Parameters:
@@ -311,60 +317,51 @@ def getDate_img(pic:str ,picPath:str) -> datetime:
   - tuple[str]: A tuple containing the file path and the date extracted from the EXIF data.
           If the EXIF data does not contain the date, None is returned.
   """
+  
+  def handleExif(data:str | None, time:datetime) -> datetime:
+    if data is None:
+      return time
+    if isinstance(data, bytes):
+      data = data.decode()
+    if(time is None):
+      time = datetime.fromisoformat(data)
+    else:
+      time = min(time, datetime.fromisoformat(data))
+    return time
+  
+  time:datetime = datetime.now()
+  Pic = None
   try:
-    pic = img.open(pic)
-    pic.load()
-    time:datetime = datetime.now()
-    exifData = pic.getexif()
+    Pic = img.open(pic)
+    Pic.load()
+    exifData = Pic.getexif()
     
     if(exifData): # if there is exif data
       if(exifData.get(36867)):# if there is a date time original
-        data = exifData.get(36867)
-        if isinstance(data, bytes):
-          data = data.decode()
-        if(not time):
-          time = data
-        else:
-          time = min(time, datetime.fromisoformat(data))
+        data_origTime = exifData.get(36867)
+        time = handleExif(data_origTime, time)
+        
       if(exifData.get(306)):# if there is a date time
-        data = exifData.get(306)
-        if isinstance(data, bytes):
-          data = data.decode()
-        if(not time):
-          time = data
-        else:
-          time = min(time, datetime.fromisoformat(data))
+        data_dateTime = exifData.get(306)
+        time = handleExif(data_dateTime, time)
+        
       if(exifData.get(36868)):# if there is a date time digitized
-        data = exifData.get(36868)
-        if isinstance(data, bytes):
-          data = data.decode()
-        if(not time):
-          time = data
-        else:
-          time = min(time, datetime.fromisoformat(data))
+        data_digitizedTime = exifData.get(36868)
+        time = handleExif(data_digitizedTime, time)
+        
       if(exifData.get(50971)):# if there is a subsec time
-        data = exifData.get(50971)
-        if isinstance(data, bytes):
-          data = data.decode()
-        if(not time):
-          time = data
-        else:
-          time = min(time, datetime.fromisoformat(data))
+        data_subsecTime = exifData.get(50971)
+        time = handleExif(data_subsecTime, time)
+        
       if(exifData.get(29)):# if there is a date time original (old)
-        data = exifData.get(29)
-        if isinstance(data, bytes):
-          data = data.decode()
-        if(not time):
-          time = data
-        else:
-          time = min(time, datetime.fromisoformat(data))
-    pic.close()
+        data_origOld = exifData.get(29)
+        time = handleExif(data_origOld, time)
+    Pic.close()
   except:
-    try:
-      pic.close()
-    except:
-      pass
-    return time
+    pass
+  if Pic is not None:
+    # if the image could not be opened, try to close it
+    Pic.close()
   return time
 
 def metaDataRead(picPath:str) ->datetime:
@@ -376,18 +373,19 @@ def metaDataRead(picPath:str) ->datetime:
     tuple[str]: A tuple containing the formatted picture path and the extracted time information.
   """
   time:datetime = datetime.now()
-  try:
-    parser = createParser(picPath)
-    
-    metadata:Metadata = extractMetadata(parser)
-    data:dict = metadata.exportDictionary().get("Metadata")
-    if(data == None or len(data.keys()) == 0): return
-    for key in data.keys():
-      key:str
-      if("date" in key.lower() or "modification" in key.lower() or "time" in key.lower()):
-        time = min(time, datetime.fromisoformat(data.get(key)))
-  except:
-    pass
+  parser = createParser(picPath)
+  
+  metadata:Metadata | None = extractMetadata(parser)
+  if(metadata is None): return time
+  
+  data:dict = metadata.exportDictionary().get("Metadata")
+  if(data is None or len(data.keys()) == 0): return time
+  for key in data.keys():
+    key:str
+    if("date" in key.lower() or "modification" in key.lower() or "time" in key.lower()):
+      temp = data.get(key)
+      if temp is None: continue
+      time = min(time, datetime.fromisoformat(temp))
   return time
 
 def movePictures() -> None:
@@ -473,7 +471,7 @@ def makeFile(newPath:str, orgPath:str, delete:bool, nextIndex = 1) -> None:
     return
   
   if (not os.path.exists(newPath)): #see if file does not exist
-    b = os.makedirs(newPath[::-1].split("/",1)[1][::-1],mode = 0o777,exist_ok=True)# generate folders, NOT the file 
+    os.makedirs(newPath[::-1].split("/",1)[1][::-1],mode = 0o777,exist_ok=True)# generate folders, NOT the file 
     f = open(newPath,'a')# generate the file
     f.close()
   else:# if the file name exists move the old file to a new name and try again
@@ -501,13 +499,15 @@ def printData(picPath:str, prefix = "") -> None:
   
   print(f"{prefix}{picPath}",end="\n\n")
   try:
-    i = img.open(picPath)
+    image = img.open(picPath)
     from PIL.ExifTags import TAGS
-    i.load()
+    image.load()
     print(picPath)
-    exif = i.getexif()
-    for tag in exif:
-      data = exif.get(tag)
+    exif:img.Exif = image.getexif()
+    for tag in exif.keys():
+      data:str | None = exif.get(tag)
+      if data is None:
+        continue
       if isinstance(data, bytes):
         data = data.decode()
       print(f"{prefix}{tag}:{TAGS.get(tag,tag)}:{data}")
@@ -515,18 +515,21 @@ def printData(picPath:str, prefix = "") -> None:
     print("failed to get exif information")
     try:
       parser = createParser(picPath)
-      metadata:Metadata = extractMetadata(parser)
-      data:dict = metadata.exportDictionary().get("Metadata")
-      for key in data.keys():
+      metadata:Metadata | None = extractMetadata(parser)
+      if(metadata is None):
+        print("no metadata found")
+        return
+      meta:dict = metadata.exportDictionary().get("Metadata")
+      for key in meta.keys():
         key:str
-        print(f"{prefix}{key}:{data.get(key)}")
+        print(f"{prefix}{key}:{meta.get(key)}")
       
-      if(data == None or len(data.keys()) == 0):
+      if(meta is None or len(meta.keys()) == 0):
         print(f"\nData search Failed or empty")
     except:
       print("failed to get metadata")
 
-def fileDate(picPath:str) -> tuple[str]:
+def fileDate(picPath:str) -> datetime:
   """
   Returns the date and time of the earliest timestamp associated with the given picture file.
   Parameters:
@@ -542,7 +545,7 @@ def fileDate(picPath:str) -> tuple[str]:
   )
   return time
 
-def timeFormat(picPath:str, time:datetime)-> tuple[str]:
+def timeFormat(picPath:str, time:datetime)-> tuple[str,str]:
   """
   Formats the given time object into a string and appends it to the given picture path.
   Parameters:
@@ -566,26 +569,40 @@ def removeDubes() -> None:
   """
   
   if(not antiDube): return
-  prog = progBar(len(files), disable=debug)
+  prog = progBar(1/2 * len(files) * (len(files) + 1), disable=debug)
   dubes = []
   print("\nchecker for identiske billeder")
+  cache = fileCacher(files, "C:/temp_sorter", 0, 100)
   for i in range(len(files)):
-    prog.incriment()
-    if(not img.isImageType(img.open(files[i]))): continue
+    imgI = cache.getFile(i)
+    try:
+      img.open(imgI).verify() # check if the file is a valid image
+    except:
+      prog.skip(len(files) - i)
+      cache.freeFile(i) # free the file
+      continue
     for j in range(i+1,len(files)):
+      prog.incriment()
+      imgJ = cache.getFile(j)
       try:
-        if(not img.isImageType(img.open(files[j]))): continue
-        img1 = img.open(files[i])
-        img2 = img.open(files[j])
+        img.open(imgJ).verify()
+        img1 = img.open(imgI)
+        img2 = img.open(imgJ)
         if(
           (img1.size == img2.size) and #see that the images are the same size (for speed)
           (ImageChops.difference(img1,img2).getbbox() == None)):
           # get the difference and remove all black pixels 
           # if any non black pixels are left the images are not identical
           dubes.append(i)
+          cache.freeFile(i) # free the file if it is not a valid image
+          cache.freeFile(j) # free the file if it is not a valid image
+          
           break
+        cache.freeFile(j) # free the file
       except:
-        pass
+        continue
+    cache.freeFile(i)
+  cache.close() # close the cache
   print(f"\n{len(dubes)} identiske billeder fundet")
   prog = progBar(len(dubes), disable=debug)
   print("fjerner identiske billeder")
