@@ -3,11 +3,11 @@ import sys
 from time import time
 
 class progBar():
-  def __init__(self, total:Union[float,int],startTime:int = None, prefix:str='Progress:',length:int=50,fill:str='█',empty:str = '-',disable:bool = False) -> None:
+  def __init__(self, total:Union[float,int],startTime:float | None = None, prefix:str='Progress:',length:int=50,fill:str='█',empty:str = '-',disable:bool = False) -> None:
     self.total = total
     self.disable = disable
-    if(type(startTime) != type(None)):
-      self.startTime = startTime
+    if( startTime is not None):
+      self.startTime:float = startTime
     else:
       self.startTime = time()
     
@@ -17,7 +17,7 @@ class progBar():
     self.empty = empty
     self.iteration = 0
   
-  def print(self,iteration, suffix="", prefix:str = None):
+  def print(self,iteration, suffix="", prefix:str | None = None):
     if(self.disable): return
     elapsed_time = time() - self.startTime
 
@@ -31,7 +31,7 @@ class progBar():
     bar = self.fill * filled_length + '-' * (self.length - filled_length)
     time_str = f"Remaining: {remaining_time:.1f}s"
     count_str = f"{self.iteration}/{self.total}"
-    if(type(prefix) == type(None)):
+    if(prefix is not None):
       sys.stdout.write(f'\r{self.prefix} |{bar}| {percent}% {count_str} {time_str} {suffix}')
     else:
       sys.stdout.write(f'\r{prefix} |{bar}| {percent}% {count_str} {time_str} {suffix}')

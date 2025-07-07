@@ -154,35 +154,50 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
     folders = True
   else:
     if(Path is None):
-      path = input("\n\nhvor er billederne, tast enter for auto: ") or "./"
-
+      path = input("\n\nhvor er billederne, tast enter for auto: ")
+      if path is None or path == "":
+        path = "./"
+      if(not os.path.exists(path)):
+        path = "./" + path # if the path does not exist, add it to the current directory
+        os.mkdir(path) # create the directory if it does not exist
+    print(f"\n\nbillederne er i \"{path}\"")
+    
     if(precision is None):
       precision = input("\n\nskal der opdeles efter måned?\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\nbillederne vil blive opdelt efter {'måned' if precision else 'år'}")
     
     if(precision is None or precision == True):
       highPrecision = input("\n\nskal der opdeles efter dag?\ntast y for ja alt andet for nej: ") == "y"
+      print(f"\n\nbillederne vil {'blive opdelt efter dag' if highPrecision else 'blive opdelt i en usorteret bunke'}")
     else:
       highPrecision = input("\n\nskal der opdeles efter år\nellers en usorteret bunke, der kan stadig opdelles i originale mapper\ntast y for ja alt andet for nej: ") == "y"
+      print(f"\n\nbillederne vil blive opdelt efter {'år' if precision else 'intet'}")
     
     if(makeCopy is None):
       makeCopy = input("\n\nskal billederne kopires, hvis ikke flyttes de?\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\nbillederne vil blive {'kopieret' if makeCopy else 'flyttet'}")
     
     if(useFiles is None):
       useFiles = input("\n\nmå mindre præcise datoer benytes?\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\nbillederne vil {'bruge' if useFiles else 'ikke bruge'} fil datoer til sortering")
     
     if(useFiles and (readAllTypes is None)):
       readAllTypes = input("\n\nskal alle filer sorteres?\n(det garanteres ikke at filerne sorteres korrekt)\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\nalle filer{' vil' if readAllTypes else ' vil ikke'} blive sorteret")
     
     debug = Debug
     
     if(antiDube is None):
       antiDube = input("\n\nskal gentagende BILLEDER fjernes \n(baseret på billede ikke filnavn)\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\n{'fjerner' if antiDube else 'beholder'} gentagende billeder")
     
     if(threads is None):
       threads = input("\n\nWIP threads\nvil formentligt fejle\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\n{'bruger' if threads else 'bruger ikke'} threads")
     
     if(folders is None):
       folders = input("\n\nskal billederne sorteres i deres originale mapper?\ntast y for ja alt andet for nej: ") == "y"
+    print(f"\n\nbillederne vil {"" if folders else "ikke"} beholde deres originale mapper")
   
   print("\n\nfinder alle filer")
   files = loadFiles(path)
@@ -572,7 +587,7 @@ def removeDubes() -> None:
   prog = progBar(1/2 * len(files) * (len(files) + 1), disable=debug)
   dubes = []
   print("\nchecker for identiske billeder")
-  cache = fileCacher(files, "C:/temp_sorter", 0, 100)
+  cache = fileCacher(files)
   for i in range(len(files)):
     imgI = cache.getFile(i)
     try:
@@ -600,6 +615,7 @@ def removeDubes() -> None:
           break
         cache.freeFile(j) # free the file
       except:
+        cache.freeFile(j) # free the file
         continue
     cache.freeFile(i)
   cache.close() # close the cache

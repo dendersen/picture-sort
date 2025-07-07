@@ -4,7 +4,7 @@ import os
 from shutil import copy
 
 class fileCacher:
-    def __init__(self, files: list[str], destination: str, cacheID = 0, cacheSize: int = 100):
+    def __init__(self, files: list[str], destination: str = "C:/temp_sorter", cacheID = 0, cacheSize: int = 100):
         self.files:list[tuple[str,int]] = [*zip(files,[-1]*len(files))]
         self.index:int = 0
         self.cache:list[str|None] = [None] * cacheSize
@@ -12,8 +12,12 @@ class fileCacher:
         self.destination:str = destination
         self.ID:int = cacheID
         self.cacheSize:int = cacheSize
-        self.cachers:threading.Thread = threading.Thread(target=self.__cacher, daemon=True)
         self.kill:bool = False
+        
+        self.cachers:threading.Thread = threading.Thread(target=self.__cacher, daemon=True)
+        if not os.path.exists(destination):
+            os.makedirs(destination, mode=0o777, exist_ok=True)  # Ensure destination exists
+        self.cachers.start()
     
     def getFile(self, fileID: int) -> str:
         self.index = fileID
@@ -31,7 +35,6 @@ class fileCacher:
     def __cacher(self) -> None:
         cacheIndex = 0
         while True:
-            print(f"Cache index {cacheIndex} for file {self.index} is being processed...")
             if self.kill:
                 return
             if self.index >= len(self.files):
@@ -42,9 +45,9 @@ class fileCacher:
                     cacheIndex = i % self.cacheSize
                     break
             if not self.inUse[cacheIndex]:
-                self.inUse[index] = True
+                self.inUse[cacheIndex] = True
                 
-                oldCache = self.cache[index]
+                oldCache = self.cache[cacheIndex]
                 
                 os.remove(oldCache) if oldCache is not None else None
                 
@@ -52,7 +55,7 @@ class fileCacher:
                 
                 orgPath = self.files[index][0]
                 
-                self.cache[index] = orgPath
+                self.cache[cacheIndex] = orgPath
                 
                 newPath = os.path.join(self.destination, f"{self.ID}_{index}_{cacheIndex}_cache.{orgPath.split('/')[-1]}")
                 
@@ -66,8 +69,8 @@ class fileCacher:
                 print(f"Copied {orgPath} to {newPath}")
                 
                 self.files[index] = (orgPath, index)
-                self.cache[index] = newPath
-                self.inUse[index] = False
+                self.cache[cacheIndex] = newPath
+                self.inUse[cacheIndex] = False
             self.index += 1
             time.sleep(0.01)  # Sleep to prevent busy waiting
     
