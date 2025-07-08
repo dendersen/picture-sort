@@ -84,12 +84,16 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
   global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path,folders
   #takes in arguments from the command line
   if(not ignoreCMD):
+    pathCall = False
     for i in range(1,len(sys.argv)):
+      if(pathCall):
+        pathCall = False
+        continue
       if(i == "-skip"): skip = True
       if(i == "-kopi"): move = False
       if(i == "-flyt"): move = True
       if(i == "--debug"): debug = True
-      if(i == "-slet"): removeDubes = True
+      if(i == "-slet"): RemoveDubes = True
       if(i == "-file"): fileData = True
       if(i == "-all"): readAll = True
       if(i == "-threads"): threads = True
@@ -107,7 +111,7 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
         if(sys.argv[i + 1][0] != "-"):
           path = sys.argv[i + 1] or "./"
         else:
-          print(f"-path requires a path after, not argument like: \"{sys.argv[i + 1]}\"")
+          print(f"-path requires a path after, not arguments like: \"{sys.argv[i + 1]}\"")
       if(i == "-h" or i == "--help"):
         print("flags:")
         print("-skip    : skips all user input and uses default values")
@@ -311,8 +315,11 @@ def getDate(picPath:str) -> tuple[str,str]:
   out:datetime = datetime.now()
 
   # finds out based on extension how the exif information should be read
-  if(img.isImageType(img.open(picPath))):
+  try:
+    img.open(picPath).verify()
     out = getDate_img(picPath,picPath)
+  except:
+    pass
   out = min(out, metaDataRead(picPath))
   
   # if date extraction failed, try to get the date from the file itself
@@ -590,34 +597,46 @@ def removeDubes() -> None:
   cache = fileCacher(files)
   for i in range(len(files)):
     imgI = cache.getFile(i)
+    img1 = None
     try:
-      img.open(imgI).verify() # check if the file is a valid image
+      img1 = img.open(imgI)
+      img1.verify() # check if the file is a valid image
     except:
       prog.skip(len(files) - i)
+      if img1 is not None:
+        img1.close() # close the image if it is not a valid image
       cache.freeFile(i) # free the file
       continue
     for j in range(i+1,len(files)):
       prog.incriment()
       imgJ = cache.getFile(j)
+      img2 = None
       try:
-        img.open(imgJ).verify()
-        img1 = img.open(imgI)
         img2 = img.open(imgJ)
+        img2.verify()
         if(
           (img1.size == img2.size) and #see that the images are the same size (for speed)
           (ImageChops.difference(img1,img2).getbbox() == None)):
           # get the difference and remove all black pixels 
           # if any non black pixels are left the images are not identical
           dubes.append(i)
+          img1.close() # close the image
           cache.freeFile(i) # free the file if it is not a valid image
+          img2.close() # close the image
           cache.freeFile(j) # free the file if it is not a valid image
           
           break
+        img2.close() # close the image
         cache.freeFile(j) # free the file
       except:
+        if img2 is not None:
+          img2.close() # close the image if it is not a valid image
         cache.freeFile(j) # free the file
         continue
-    cache.freeFile(i)
+    if(i not in dubes): # if the image is a duplicate, free the file
+      if img1 is not None:
+        img1.close() # close the image
+      cache.freeFile(i)
   cache.close() # close the cache
   print(f"\n{len(dubes)} identiske billeder fundet")
   prog = progBar(len(dubes), disable=debug)
