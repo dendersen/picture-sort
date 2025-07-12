@@ -27,6 +27,7 @@ secondaryTypes = [
   "REAL_AUDIO","real_audio",
   "SUN_NEXT_SND","sun_next_snd",
   "RAW","raw",
+  "CR3","cr3",
 ]
 
 # global variables
@@ -68,7 +69,9 @@ folders:bool | None = None
 #where the pictures where found
 path:str = "./"
 
-def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None, readAll:bool | None = None, Debug:bool = False, RemoveDubes:bool | None = None, Folders:bool | None = None, Path:str | None = None, ignoreCMD:bool = False) -> None:
+recursiveFolders:bool | None = None
+
+def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None, readAll:bool | None = None, Debug:bool = False, RemoveDubes:bool | None = None, Folders:bool | None = None, Path:str | None = None, ignoreCMD:bool = False, recursiveFolderDates:bool | None = None) -> None:
   """
   Initializes the sorting process for pictures.
   Args:
@@ -81,7 +84,7 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
   Returns:
     None
   """
-  global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path,folders
+  global precision,highPrecision,files,makeCopy,debug,useFiles,readAllTypes,antiDube,threads,path,folders,recursiveFolders
   #takes in arguments from the command line
   if(not ignoreCMD):
     pathCall = False
@@ -98,6 +101,7 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
       if(i == "-all"): readAll = True
       if(i == "-threads"): threads = True
       if(i == "-folders"): folders = True
+      if(i == "-recursive"): recursiveFolders = True
       if(i == "-måned"): precision = True
       if(i == "-dag"): 
         highPrecision = True
@@ -143,6 +147,8 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
     debug = Debug
   if(Path is not None):
     path = Path
+  if(recursiveFolderDates is not None):
+    recursiveFolders = recursiveFolderDates
   
   if(skip):
     # default values
@@ -156,6 +162,7 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
     antiDube = False
     threads = False
     folders = True
+    recursiveFolders = False
   else:
     if(Path is None):
       path = input("\n\nhvor er billederne, tast enter for auto: ")
@@ -202,6 +209,11 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
     if(folders is None):
       folders = input("\n\nskal billederne sorteres i deres originale mapper?\ntast y for ja alt andet for nej: ") == "y"
     print(f"\n\nbillederne vil {"" if folders else "ikke"} beholde deres originale mapper")
+    if not precision and highPrecision:
+      if(recursiveFolders is None):
+        recursiveFolders = input("\n\nskal datoer gemmes i undermaper eller en mappe for hver dato?\ntast y for ja alt andet for nej: ") == "y"
+    else:
+      recursiveFolders = False
   
   print("\n\nfinder alle filer")
   files = loadFiles(path)
@@ -253,6 +265,7 @@ def check() -> None:
   for i in toBeRemoved[::-1]:
     files.remove(files[i])
     prog.incriment()
+  prog.end()
   print(f"\nder er {len(files)} gyldige billeder")
 
 def acceptedType(picPath:str) -> bool:
@@ -450,13 +463,13 @@ def movePic(prog:progBar, dates:list[list[str]]) -> None:
   Returns:
     None
   """
-  global folders
+  global folders, path
   for i in dates:
     name:str = ""
     if(folders):
-      name = i[0].split("/")[-1]# the file name
-    else:
       name = i[0].removeprefix(path)# everything in the (relative) path after start path(still sorted in original folders)
+    else:
+      name = i[0].split("/")[-1]# the file name
     year = i[1].split(":")[0]
     month = i[1].split(":")[1]
     day = i[1].split(":")[2]
@@ -465,13 +478,22 @@ def movePic(prog:progBar, dates:list[list[str]]) -> None:
       day = day.split(" ")[0]
     newPath:str
     if(precision and highPrecision):# consider where to put the file
-      newPath = f"./sorterede/{year}/{month}/{day}/{name}"
+      if recursiveFolders:
+        newPath = f"./sorterede/{year}/{month}/{day}/{name}"
+      else:
+        newPath = f"./sorterede/{year}_{month}_{day}/{name}"
     elif(precision):
-      newPath = f"./sorterede/{year}/{month}/{name}"
+      if recursiveFolders:
+        newPath = f"./sorterede/{year}/{month}/{name}"
+      else:
+        newPath = f"./sorterede/{year}_{month}/{name}"
     elif(highPrecision):
       newPath = f"./sorterede/{name}"
     else:
-      newPath = f"./sorterede/{year}/{name}"
+      if recursiveFolders:
+        newPath = f"./sorterede/{year}/{name}"
+      else:
+        newPath = f"./sorterede/{year}/{name}"
     
     makeFile(newPath, i[0],not makeCopy)# save the file
     prog.incriment()
@@ -660,7 +682,7 @@ while(True):
   print(f"tast a for at se alle filer ({len(files)})")
   user = input("")
   if(user == "q"): 
-    exit()
+    break
   if(user == "d"):
     if(len(dates) == 0):
       print("der er ingen filer der blev sorteret")

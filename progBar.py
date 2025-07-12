@@ -47,6 +47,18 @@ class progBar():
   def decriment(self):
     self.iteration -= 1
 
+  def end(self):
+    if(self.disable): return
+    elapsed_time = time() - self.startTime
+    percent = '100.0'
+    filled_length = self.length
+    bar = self.fill * filled_length + '-' * (self.length - filled_length)
+    time_str = f"Elapsed: {elapsed_time:.1f}s"
+    count_str = f"{self.iteration}/{self.total}"
+    sys.stdout.write(f'\r{self.prefix} |{bar}| {percent}% {count_str} {time_str}\n')
+    sys.stdout.flush()
+
+
 def printProgressBar(iteration, total, startTime, prefix='Progress:', suffix='', length=50, fill='█'):
   total -= 1
   elapsed_time = time() - startTime
