@@ -11,6 +11,9 @@ from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
 from hachoir.metadata.metadata import Metadata
 from fileCacher import fileCacher
+import requests
+import os
+from datetime import datetime
 
 #constants
 register_heif_opener()
@@ -152,7 +155,7 @@ def init(skip:bool = False, move:bool | None = None, fileData:bool | None = None
   
   if(skip):
     # default values
-    path = "./"
+    path = "\\\\192.168.1.194\\Backup\\pictures\\editor"
     precision= True
     highPrecision = True
     makeCopy = True
@@ -232,6 +235,8 @@ def loadFiles(path: str, depth = 0) ->list[str]:
   global maxDepth
   out:list[str] = []
   for f in os.listdir(path): # find all paths in directory
+    if f.find("sorterede") != -1: # skip the sorted folder
+      continue
     if os.path.isfile(path + "/" + f):
       out.append(path + "/" + f) # append files
     else:
@@ -239,7 +244,7 @@ def loadFiles(path: str, depth = 0) ->list[str]:
         out.extend(loadFiles(path + "/" + f,depth + 1))
   return out
 
-def check() -> None:
+def check(typeOverride: bool = False,types:list[str] = []) -> None:
   """
   Check function is used to register files and remove invalid files from the list.
   Parameters:
@@ -253,10 +258,13 @@ def check() -> None:
   toBeRemoved:list[int] = []
   prog = progBar(len(files),disable=debug)
   for j,f in enumerate(files):
-    if(not(
+    if((not(
       ((not readAllTypes) and acceptedType(f)) or 
       (readAllTypes and not os.path.isdir(f))
-    )):
+    ) 
+      and not typeOverride) or 
+      typeOverride and not f.endswith(tuple(types))
+    ):
       toBeRemoved.append(j)
     prog.incriment()
   print(f"\n\n{len(files)} filer registreret")
@@ -668,11 +676,41 @@ def removeDubes() -> None:
     files.remove(files[i])
   print("identiske billeder er blevet fjernet")
 
-init()
-check()
-removeDubes()
-findDate()
-movePictures()
+def transferFiles() -> None:
+  #!/usr/bin/python3
+  API_KEY = input("Enter API Key: ")              # replace with a valid api key
+  BASE_URL = 'http://192.168.1.194:30041/api'  # replace as needed
+  def upload(file):
+      stats = os.stat(file)
+      headers = {
+          'Accept': 'application/json',
+          'x-api-key': API_KEY
+      }
+      data = {
+          'deviceAssetId': f'{file}-{stats.st_mtime}',
+          'deviceId': 'python_transfer',
+          'fileCreatedAt': datetime.fromtimestamp(stats.st_mtime),
+          'fileModifiedAt': datetime.fromtimestamp(stats.st_mtime),
+          'isFavorite': 'false',
+      }
+      files = {
+          'assetData': open(file, 'rb')
+      }
+      response = requests.post(
+          f'{BASE_URL}/assets', headers=headers, data=data, files=files)
+      return response.json()["status"]# print(response.json())
+      # {'id': 'ef96f635-61c7-4639-9e60-61a11c4bbfba', 'duplicate': False}
+  prog = progBar(len(files), disable=debug)
+  for file in files:
+    status = upload(file)
+    prog.incriment(suffix=f"uploaded {file} status: {status}")
+
+init(skip=True)
+check(typeOverride=True,types = [".jpg",".JPG",".png",".PNG","JPEG","jpeg"])
+transferFiles()
+# removeDubes()
+# findDate()
+# movePictures()
 
 #ending loop for debug and user being able to see know the program didn't crash but actually finished
 while(True):

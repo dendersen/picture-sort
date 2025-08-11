@@ -31,7 +31,7 @@ class progBar():
     bar = self.fill * filled_length + '-' * (self.length - filled_length)
     time_str = f"Remaining: {remaining_time:.1f}s"
     count_str = f"{self.iteration}/{self.total}"
-    if(prefix is not None):
+    if(prefix is None):
       sys.stdout.write(f'\r{self.prefix} |{bar}| {percent}% {count_str} {time_str} {suffix}')
     else:
       sys.stdout.write(f'\r{prefix} |{bar}| {percent}% {count_str} {time_str} {suffix}')
